@@ -89,10 +89,10 @@ body.embed .panel, body.embed .card { display: none; }
 <body>
 <div id="map"></div>
 <div class="panel">
-  <p class="kick">Location intelligence · demo</p>
+  <p class="kick">Location intelligence demo</p>
   <h1>Choosing where to open the next store</h1>
   <p class="lede">Learn what makes an existing store do well from the area around it, then score every 400&nbsp;m cell of South and Central Jakarta and shortlist the best empty ones.</p>
-  <span class="pill">Real OSM places · synthetic sales &amp; demographics</span>
+  <span class="pill">Real OSM places, synthetic sales and demographics</span>
   <div class="steps" id="steps"></div>
   <div class="step" id="step"></div>
   <div class="nav"><button class="b" id="prev">← Back</button><button class="b go" id="next">Next →</button></div>
@@ -243,7 +243,7 @@ body.embed .panel, body.embed .card { display: none; }
       h = '<h2>Describe the area around every cell</h2><p>The map is cut into ' + NC.toLocaleString() + ' cells of about 400&nbsp;m. Each one gets eight attributes in three families, measured over a ~800&nbsp;m catchment. Pick one to see it.</p>' +
         '<p class="sec">Attribute</p><select id="feat">' + D.meta.families.map(function (f) { return '<optgroup label="' + FAML[f] + '">' + D.meta.features.filter(function (x) { return x.family === f; }).map(function (x) { return '<option value="' + x.key + '"' + (x.key === S.feat ? ' selected' : '') + '>' + x.label + '</option>'; }).join('') + '</optgroup>'; }).join('') + '</select>';
       var F = D.meta.features.find(function (x) { return x.key === S.feat; });
-      card = '<p class="sec">' + FAML[F.family] + ' · ' + F.label + '</p>' + legendRamp('low', 'high · ' + F.unit) +
+      card = '<p class="sec">' + FAML[F.family] + ': ' + F.label + '</p>' + legendRamp('low', 'high · ' + F.unit) +
         (F.family === 'poi' ? '<div class="legend">' + D.meta.poiGroups.map(function (g, i) { return '<span><i style="background:rgb(' + POIC[i] + ')"></i>' + g + '</span>'; }).join('') + '</div><p class="note">' + D.meta.nPoi.toLocaleString() + ' real places and stops from OpenStreetMap.</p>'
           : F.family === 'demographic' ? '<p class="note">Synthetic, shaped to Jakarta\'s geography. In the real project this came from census and survey data.</p>'
           : '<p class="note">Transit access is real (OSM rail and bus stops). Footfall is a synthetic index built on it; the real project used mobility data.</p>');
@@ -260,7 +260,7 @@ body.embed .panel, body.embed .card { display: none; }
       h = '<h2>Decide: a shortlist to check on the ground</h2><p>Take the highest-scoring cells, but keep each one a minimum distance from existing outlets and from each other so new stores don\'t eat each other\'s sales.</p>' +
         '<div class="ctl"><span>Minimum spacing</span><b id="rv">' + S.radius.toFixed(1) + ' km</b><input id="rad" type="range" min="0.4" max="3" step="0.1" value="' + S.radius + '"></div>' +
         '<div class="ctl"><span>Shortlist size</span><b id="nv">' + S.n + '</b><input id="num" type="range" min="3" max="20" step="1" value="' + S.n + '"></div><p class="sec">Signals used</p>' + famChips();
-      card = '<p class="sec">Top ' + picks.length + ' new sites <small>· vs median outlet</small></p><ol class="short" id="short">' + picks.map(function (c, k) {
+      card = '<p class="sec">Top ' + picks.length + ' new sites <small>(vs median outlet)</small></p><ol class="short" id="short">' + picks.map(function (c, k) {
         var s = m.score[c]; return '<li data-k="' + k + '"' + (k === S.sel ? ' class="on"' : '') + '><i>' + (k + 1) + '</i><span>' + cellCenter(c).map(function (v) { return v.toFixed(3); }).reverse().join(', ') + '</span><b>' + fmt(s) + ' <span>' + (s >= med ? '+' : '') + Math.round((s / med - 1) * 100) + '%</span></b></li>'; }).join('') +
         '</ol><div class="legend"><span><i class="sq ring"></i>shortlisted cell</span><span><i style="background:#fff"></i>existing outlet</span></div><p class="note">The real model guided growth from under 100 to 200+ outlets.</p>';
     }
