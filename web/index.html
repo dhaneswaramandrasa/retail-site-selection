@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Retail Site Selection</title>
+<meta name="description" content="Learn what makes a store succeed from the area around it, score every map cell, and shortlist where to open next. OpenStreetMap POIs with synthetic demographics and sales.">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Retail site selection: score every 400 m cell of South/Central Jakarta. Data from data/sites.json, written by scripts/build_data.py. */
+:root { --bg: #0b0d17; --panel: rgba(14,16,28,.88); --fg: #f4f4f8; --muted: #9298b0; --ink2: #c9cbd8; --line: rgba(255,255,255,.12); --accent: #9a9df0; --hot: #ff9f43; --well: rgba(255,255,255,.06); --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 14.5px/1.5 "Archivo", -apple-system, "Helvetica Neue", Arial, sans-serif; overflow: hidden; }
+#map { position: fixed; inset: 0; }
+.panel, .card { position: absolute; z-index: 2; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.45); overflow: auto; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.panel { top: 16px; left: 16px; width: 360px; max-height: calc(100% - 32px); padding: 18px 20px 14px; }
+.card { top: 16px; right: 16px; width: 320px; max-height: calc(100% - 110px); padding: 16px 18px 14px; }
+.card:empty { display: none; }
+.kick { font: 500 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 0; }
+h1 { font-weight: 800; font-size: 28px; letter-spacing: -0.03em; line-height: 1.04; margin: 10px 0 0; }
+.lede { margin: 10px 0 0; color: var(--ink2); }
+.pill { display: inline-block; margin-top: 10px; font: 500 10.5px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); border: 1.5px solid var(--accent); border-radius: 999px; padding: 2px 9px; }
+.steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin: 16px 0 0; }
+.steps button { font: 500 10px var(--mono); letter-spacing: .03em; text-transform: uppercase; color: var(--muted); background: none; border: 0; border-top: 3px solid var(--line); padding: 7px 0 0; text-align: left; cursor: pointer; }
+.steps button[aria-current="step"] { color: var(--accent); border-top-color: var(--accent); }
+.steps button.done { border-top-color: #b9bbe6; }
+.step h2 { margin: 14px 0 0; font-size: 19px; font-weight: 800; letter-spacing: -0.01em; }
+.step p { margin: 6px 0 0; color: var(--ink2); font-size: 13.5px; }
+.sec { margin: 14px 0 6px; font: 500 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.sec small { letter-spacing: 0; text-transform: none; }
+.nav { display: flex; justify-content: space-between; margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+button.b, .chips button { font: 600 12.5px "Archivo", sans-serif; color: var(--fg); background: var(--well); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+button.b:hover, .chips button:hover { border-color: var(--accent); color: var(--accent); }
+button.b.go { background: var(--accent); border-color: var(--accent); color: #0b0d17; }
+button.b:disabled { opacity: .35; cursor: default; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chips button { font-size: 12px; padding: 3px 10px; display: inline-flex; gap: 6px; align-items: center; }
+.chips button i { width: 9px; height: 9px; border-radius: 50%; }
+.chips button[aria-pressed="true"] { background: var(--fg); border-color: var(--fg); color: #0b0d17; }
+.big { font-weight: 800; font-size: 38px; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.big small { font-size: 15px; font-weight: 700; margin-left: 2px; }
+.sub { font: 12px var(--mono); color: var(--muted); margin-top: 3px; }
+.bars { display: grid; grid-template-columns: 132px 1fr 44px; gap: 5px 8px; align-items: center; font-size: 12.5px; }
+.bars .tr { position: relative; height: 9px; background: var(--well); border-radius: 2px; }
+.bars .tr::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--muted); }
+.bars .tr b { position: absolute; top: 0; bottom: 0; border-radius: 2px; transition: all .5s; }
+.bars .v { font: 11.5px var(--mono); color: var(--muted); text-align: right; }
+.bars .off { opacity: .35; }
+.kv { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.kv div { background: var(--well); border-radius: 8px; padding: 7px 9px; }
+.kv b { display: block; font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.kv span { font: 10.5px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.note { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+select { width: 100%; font: 600 13px "Archivo", sans-serif; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: #1a1d2e; color: var(--fg); }
+.ctl { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; font-size: 12.5px; margin-top: 6px; }
+.ctl input { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+.ctl b { font: 600 12.5px var(--mono); }
+ol.short { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
+ol.short li { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: baseline; padding: 6px 8px; border-radius: 8px; background: var(--well); cursor: pointer; font-size: 12.5px; }
+ol.short li:hover, ol.short li.on { outline: 1px solid var(--hot); }
+ol.short li i { font: 700 12px var(--mono); font-style: normal; color: var(--hot); }
+ol.short li span { font: 11px var(--mono); color: var(--muted); }
+ol.short li b { font: 600 12.5px var(--mono); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink2); margin-top: 8px; }
+.legend i { display: inline-block; width: 10px; height: 10px; margin-right: 5px; vertical-align: -1px; border-radius: 50%; }
+.legend i.sq { border-radius: 1px; } .legend i.ring { background: none !important; border: 2px solid var(--hot); border-radius: 1px; }
+.ramp { height: 8px; border-radius: 2px; margin-top: 6px; }
+.rampl { display: flex; justify-content: space-between; font: 10.5px var(--mono); color: var(--muted); margin-top: 3px; }
+svg.sc { width: 100%; height: auto; display: block; margin-top: 4px; }
+svg.sc text { fill: var(--muted); font: 10px var(--mono); }
+.foot { margin: 12px 0 0; font-size: 11.5px; color: var(--muted); }
+.foot a { color: var(--accent); text-decoration: none; }
+.tt { position: absolute; z-index: 3; pointer-events: none; background: #1a1d2e; color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; box-shadow: 0 8px 24px rgba(20,20,40,.18); display: none; max-width: 260px; }
+.tt span { display: block; font: 11px var(--mono); color: var(--muted); }
+.maplibregl-ctrl-group { background: #1a1d2e; } .maplibregl-ctrl-group button + button { border-top-color: rgba(255,255,255,.1); }
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: invert(1); }
+.maplibregl-ctrl-attrib { background: rgba(14,16,28,.7) !important; color: var(--muted); } .maplibregl-ctrl-attrib a { color: var(--muted); }
+body.embed .panel, body.embed .card { display: none; }
+@media (max-width: 860px) {
+  .panel { top: auto; bottom: 0; left: 0; right: 0; width: auto; max-height: 52%; border-radius: 14px 14px 0 0; padding: 14px 16px 10px; }
+  h1 { font-size: 22px; } .lede, .pill { display: none; }
+  .card { top: 10px; left: 10px; right: 10px; width: auto; max-height: 30%; padding: 10px 14px; }
+}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="panel">
+  <p class="kick">Location intelligence · demo</p>
+  <h1>Choosing where to open the next store</h1>
+  <p class="lede">Learn what makes an existing store do well from the area around it, then score every 400&nbsp;m cell of South and Central Jakarta and shortlist the best empty ones.</p>
+  <span class="pill">Real OSM places · synthetic sales &amp; demographics</span>
+  <div class="steps" id="steps"></div>
+  <div class="step" id="step"></div>
+  <div class="nav"><button class="b" id="prev">← Back</button><button class="b go" id="next">Next →</button></div>
+  <p class="foot">Method from <a href="https://dhaneswara-mandrasa.vercel.app/project-retail-sites">the case study</a> · <a href="https://github.com/dhaneswaramandrasa/retail-site-selection">code</a> · POIs © OpenStreetMap contributors</p>
+</div>
+<div class="card" id="card"></div>
+<div class="tt" id="tt"></div>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/deck.gl@9.0.38/dist.min.js"></script>
+<script>
+(function () {
+  'use strict';
+  var MOBILE = matchMedia('(max-width: 860px)').matches;
+  if (/[?&]embed/.test(location.search)) document.body.classList.add('embed');
+  var D, M, NC, OUT_SET = {};
+  var STEPS = ['Input', 'Describe', 'Learn', 'Score', 'Decide'];
+  var FAMC = { demographic: [120, 200, 255], poi: [154, 157, 240], mobility: [90, 220, 170] };
+  var FAML = { demographic: 'Demographic', poi: 'Places (POI)', mobility: 'Mobility' };
+  var POIC = [[255, 159, 67], [154, 157, 240], [90, 220, 170], [255, 107, 129], [120, 200, 255], [200, 200, 210], [255, 230, 90]];
+  var HOT = [255, 159, 67];
+  var S = { step: 0, feat: 'footfall', fams: { demographic: true, poi: true, mobility: true }, radius: 1.2, n: 10, sel: -1 };
+  var $ = function (id) { return document.getElementById(id); };
+  function mix(a, b, t) { return [0, 1, 2].map(function (i) { return Math.round(a[i] + (b[i] - a[i]) * t); }); }
+  var VIR = [[30, 30, 70], [58, 50, 140], [110, 80, 200], [170, 130, 240], [230, 200, 255]];
+  function ramp(t) { t = Math.max(0, Math.min(1, t)) * (VIR.length - 1); var i = Math.min(VIR.length - 2, Math.floor(t)); return mix(VIR[i], VIR[i + 1], t - i); }
+  function rampCss() { return 'linear-gradient(90deg,' + VIR.map(function (c) { return 'rgb(' + c + ')'; }).join(',') + ')'; }
+  function fmt(n) { return n >= 1000 ? (n / 1000).toFixed(1) + 'B' : Math.round(n) + 'M'; }
+
+  var map = new maplibregl.Map({ container: 'map', style: 'https://tiles.openfreemap.org/styles/dark',
+    center: [106.83, -6.235], zoom: MOBILE ? 10.6 : 11.7, pitch: 0, bearing: 0, attributionControl: { compact: true } });
+  var overlay = new deck.MapboxOverlay({ interleaved: true, layers: [] });
+  map.addControl(overlay);
+  map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
+
+  function cellPoly(c) { var i = Math.floor(c / D.meta.nx), j = c % D.meta.nx, st = D.meta.step, x = D.meta.bbox[0] + j * st, y = D.meta.bbox[1] + i * st, g = st * .06;
+    return [[x + g, y + g], [x + st - g, y + g], [x + st - g, y + st - g], [x + g, y + st - g]]; }
+  function cellCenter(c) { var i = Math.floor(c / D.meta.nx), j = c % D.meta.nx, st = D.meta.step; return [D.meta.bbox[0] + (j + .5) * st, D.meta.bbox[1] + (i + .5) * st]; }
+  function famKey() { var k = D.meta.families.filter(function (f) { return S.fams[f]; }); return k.join('+'); }
+  function model() { return D.models[famKey()]; }
+  function km(a, b) { var p = cellCenter(a), q = cellCenter(b); var dx = (p[0] - q[0]) * 110.6 * Math.cos(p[1] * Math.PI / 180), dy = (p[1] - q[1]) * 110.6; return Math.sqrt(dx * dx + dy * dy); }
+
+  // ---------- shortlist: best live cells far enough from outlets and from each other ----------
+  function shortlist() {
+    var sc = model().score, order = [], out = D.outlets.map(function (o) { return o.c; }), picks = [];
+    for (var c = 0; c < NC; c++) if (D.live[c] && !OUT_SET[c]) order.push(c);
+    order.sort(function (a, b) { return sc[b] - sc[a]; });
+    for (var k = 0; k < order.length && picks.length < S.n; k++) {
+      var c2 = order[k], ok = true;
+      for (var o = 0; o < out.length && ok; o++) if (km(c2, out[o]) < S.radius) ok = false;
+      for (var p = 0; p < picks.length && ok; p++) if (km(c2, picks[p]) < S.radius) ok = false;
+      if (ok) picks.push(c2);
+    }
+    return picks;
+  }
+  function median(a) { var s = a.slice().sort(function (x, y) { return x - y; }); return s[Math.floor(s.length / 2)]; }
+
+  // ---------- layers ----------
+  function layers() {
+    var st = S.step, layersOut = [], cells = [];
+    for (var c = 0; c < NC; c++) cells.push(c);
+    var fi = D.meta.features.findIndex(function (f) { return f.key === S.feat; });
+    var vals = st === 1 ? D.feat[fi] : st >= 2 ? model().score : null, lo = Infinity, hi = -Infinity;
+    if (vals) { var srt = vals.filter(function (v, i) { return D.live[i]; }).sort(function (a, b) { return a - b; }); lo = srt[Math.floor(srt.length * .02)]; hi = srt[Math.floor(srt.length * .98)]; }
+    function t(c) { return Math.max(0, Math.min(1, (vals[c] - lo) / (hi - lo || 1))); }
+    if (vals) layersOut.push(new deck.SolidPolygonLayer({
+      id: 'cells', data: cells, pickable: true, extruded: st >= 3, wireframe: false,
+      getPolygon: cellPoly,
+      getElevation: function (c) { return st >= 3 && D.live[c] ? Math.pow(t(c), 1.6) * 1800 : 0; },
+      getFillColor: function (c) { return ramp(t(c)).concat(D.live[c] ? 215 : 40); },
+      updateTriggers: { getFillColor: [st, S.feat, famKey()], getElevation: [st, famKey()] },
+      transitions: { getElevation: 600, getFillColor: 400 },
+      onHover: hover
+    }));
+    if (st === 1 && D.meta.features[fi].family === 'poi') layersOut.push(new deck.ScatterplotLayer({
+      id: 'pois', data: D.pois, getPosition: function (p) { return [p[0], p[1]]; }, getFillColor: function (p) { return POIC[p[2]].concat(200); },
+      radiusUnits: 'pixels', getRadius: 1.6
+    }));
+    var maxS = Math.max.apply(null, D.outlets.map(function (o) { return o.sales; }));
+    layersOut.push(new deck.ScatterplotLayer({
+      id: 'outlets', data: D.outlets, pickable: true, getPosition: function (o) { var p = cellCenter(o.c); return [p[0], p[1], st >= 3 ? 1900 : 0]; },
+      radiusUnits: 'pixels', getRadius: function (o) { return st === 0 ? 3 + 9 * Math.sqrt(o.sales / maxS) : 4.5; },
+      getFillColor: st === 0 ? [255, 255, 255, 235] : [255, 255, 255, 200], stroked: true, getLineColor: [11, 13, 23], lineWidthUnits: 'pixels', getLineWidth: 1.5,
+      updateTriggers: { getRadius: st, getPosition: st }, onHover: hover
+    }));
+    if (st === 4) {
+      var picks = shortlist();
+      layersOut.push(new deck.PolygonLayer({
+        id: 'picks', data: picks.map(function (c, k) { return { c: c, k: k }; }), pickable: true, filled: true, stroked: true,
+        getPolygon: function (d) { return cellPoly(d.c).map(function (p) { return [p[0], p[1], 1950]; }); },
+        getFillColor: function (d) { return HOT.concat(d.k === S.sel ? 230 : 120); }, getLineColor: HOT.concat(255), lineWidthUnits: 'pixels', getLineWidth: 2.5,
+        updateTriggers: { getFillColor: S.sel }, onHover: function (info) { hover(info.object ? { object: info.object.c, x: info.x, y: info.y, layer: { id: 'cells' } } : info); }
+      }));
+      layersOut.push(new deck.TextLayer({
+        id: 'picknum', data: picks, getPosition: function (c) { var p = cellCenter(c); return [p[0], p[1], 2050]; }, getText: function (c, x) { return String(x.index + 1); },
+        getSize: 13, getColor: [11, 13, 23], fontWeight: 800, fontFamily: 'Archivo, Arial, sans-serif', billboard: true
+      }));
+    }
+    return layersOut;
+  }
+  function draw() { overlay.setProps({ layers: layers() }); }
+
+  function hover(info) {
+    var tt = $('tt');
+    if (info.object == null) { tt.style.display = 'none'; return; }
+    var html;
+    if (info.layer.id === 'outlets') { var o = info.object;
+      html = '<b>Existing outlet</b> · ' + fmt(o.sales) + ' IDR / month<span>predicted ' + fmt(model().score[o.c]) + '</span>';
+    } else { var c = info.object, fi = D.meta.features.findIndex(function (f) { return f.key === S.feat; }), F = D.meta.features[fi];
+      html = S.step === 1 ? '<b>' + D.feat[fi][c].toLocaleString() + '</b> ' + F.unit + '<span>' + F.label + '</span>'
+        : '<b>' + fmt(model().score[c]) + ' IDR / month</b> predicted sales<span>' + (OUT_SET[c] ? 'has an outlet' : D.live[c] ? 'cell ' + c : 'little activity, not a candidate') + '</span>';
+    }
+    tt.innerHTML = html; tt.style.display = 'block'; tt.style.left = info.x + 14 + 'px'; tt.style.top = info.y + 10 + 'px';
+  }
+
+  // ---------- panel ----------
+  function famChips() {
+    return '<div class="chips" id="fams">' + D.meta.families.map(function (f) {
+      return '<button data-f="' + f + '" aria-pressed="' + !!S.fams[f] + '"><i style="background:rgb(' + FAMC[f] + ')"></i>' + FAML[f] + '</button>'; }).join('') + '</div>';
+  }
+  function bindFams() {
+    $('fams').onclick = function (e) { var b = e.target.closest('button'); if (!b) return; var f = b.dataset.f;
+      var on = D.meta.families.filter(function (x) { return S.fams[x]; }); if (S.fams[f] && on.length === 1) return;
+      S.fams[f] = !S.fams[f]; S.sel = -1; renderStep(); draw(); };
+  }
+  function weightBars() {
+    var w = model().w, mx = Math.max.apply(null, D.models['demographic+poi+mobility'].w.map(Math.abs));
+    return '<div class="bars">' + D.meta.features.map(function (f, i) {
+      var v = w[i], on = S.fams[f.family], wd = Math.abs(v) / mx * 50, c = 'rgb(' + FAMC[f.family] + ')';
+      return '<span class="' + (on ? '' : 'off') + '">' + f.label + '</span><div class="tr ' + (on ? '' : 'off') + '"><b style="background:' + c + ';width:' + wd + '%;left:' + (v >= 0 ? 50 : 50 - wd) + '%"></b></div><span class="v">' + (on ? (v > 0 ? '+' : '') + v.toFixed(2) : '–') + '</span>';
+    }).join('') + '</div>';
+  }
+  function scatter() {
+    var cv = model().cv, all = cv.flat(), lo = Math.log(Math.min.apply(null, all)) - .05, hi = Math.log(Math.max.apply(null, all)) + .05, W = 300, H = 150;
+    function x(v) { return 26 + (Math.log(v) - lo) / (hi - lo) * (W - 34); } function y(v) { return H - 18 - (Math.log(v) - lo) / (hi - lo) * (H - 26); }
+    return '<svg class="sc" viewBox="0 0 ' + W + ' ' + H + '"><line x1="' + x(Math.exp(lo)) + '" y1="' + y(Math.exp(lo)) + '" x2="' + x(Math.exp(hi)) + '" y2="' + y(Math.exp(hi)) + '" stroke="rgba(255,255,255,.25)" stroke-dasharray="4 4"/>' +
+      cv.map(function (p) { return '<circle cx="' + x(p[0]).toFixed(1) + '" cy="' + y(p[1]).toFixed(1) + '" r="3" fill="#9a9df0" fill-opacity=".8"/>'; }).join('') +
+      '<text x="' + (W - 4) + '" y="' + (H - 4) + '" text-anchor="end">actual sales →</text><text x="4" y="10">↑ predicted (held out)</text></svg>';
+  }
+  function legendRamp(a, b) { return '<div class="ramp" style="background:' + rampCss() + '"></div><div class="rampl"><span>' + a + '</span><span>' + b + '</span></div>'; }
+
+  function renderStep(keep) {
+    $('steps').innerHTML = STEPS.map(function (s, i) { return '<button data-i="' + i + '"' + (i === S.step ? ' aria-current="step"' : '') + (i < S.step ? ' class="done"' : '') + '>' + (i + 1) + ' ' + s + '</button>'; }).join('');
+    var h = '', card = '', st = S.step, m = model(), sales = D.outlets.map(function (o) { return o.sales; });
+    if (st === 0) {
+      h = '<h2>Start from the stores that exist</h2><p>A retailer with ' + D.outlets.length + ' outlets and their monthly sales. Dot size is sales. The model will learn from these, so the answer is grounded in this retailer\'s own track record, not a generic rule.</p>';
+      card = '<p class="sec">The existing network</p><div class="kv"><div><b>' + D.outlets.length + '</b><span>outlets</span></div><div><b>' + fmt(median(sales)) + '</b><span>median IDR / month</span></div><div><b>' + fmt(Math.max.apply(null, sales)) + '</b><span>best outlet</span></div><div><b>' + fmt(Math.min.apply(null, sales)) + '</b><span>weakest outlet</span></div></div><p class="note">Sales and outlet locations are synthetic. Hover an outlet to see it.</p>';
+    } else if (st === 1) {
+      h = '<h2>Describe the area around every cell</h2><p>The map is cut into ' + NC.toLocaleString() + ' cells of about 400&nbsp;m. Each one gets eight attributes in three families, measured over a ~800&nbsp;m catchment. Pick one to see it.</p>' +
+        '<p class="sec">Attribute</p><select id="feat">' + D.meta.families.map(function (f) { return '<optgroup label="' + FAML[f] + '">' + D.meta.features.filter(function (x) { return x.family === f; }).map(function (x) { return '<option value="' + x.key + '"' + (x.key === S.feat ? ' selected' : '') + '>' + x.label + '</option>'; }).join('') + '</optgroup>'; }).join('') + '</select>';
+      var F = D.meta.features.find(function (x) { return x.key === S.feat; });
+      card = '<p class="sec">' + FAML[F.family] + ' · ' + F.label + '</p>' + legendRamp('low', 'high · ' + F.unit) +
+        (F.family === 'poi' ? '<div class="legend">' + D.meta.poiGroups.map(function (g, i) { return '<span><i style="background:rgb(' + POIC[i] + ')"></i>' + g + '</span>'; }).join('') + '</div><p class="note">' + D.meta.nPoi.toLocaleString() + ' real places and stops from OpenStreetMap.</p>'
+          : F.family === 'demographic' ? '<p class="note">Synthetic, shaped to Jakarta\'s geography. In the real project this came from census and survey data.</p>'
+          : '<p class="note">Transit access is real (OSM rail and bus stops). Footfall is a synthetic index built on it; the real project used mobility data.</p>');
+    } else if (st === 2) {
+      h = '<h2>Learn what a good location looks like</h2><p>A regularised linear model predicts an outlet\'s sales from the attributes of its cell. Turn signal families off to see how much each one adds. Accuracy is measured on outlets held out of training.</p><p class="sec">Signals used</p>' + famChips();
+      card = '<p class="sec">Held-out fit</p><div class="big">' + Math.round(m.r2 * 100) + '<small>%</small></div><div class="sub">of sales variance explained (5-fold CV R²)</div>' + scatter() +
+        '<p class="sec">What the model learned <small>(standardised weights)</small></p>' + weightBars();
+    } else if (st === 3) {
+      h = '<h2>Score every candidate cell</h2><p>The fitted model predicts sales for every cell, including the thousands with no store. Taller and brighter means a new store is predicted to do better. White dots are the existing outlets.</p><p class="sec">Signals used</p>' + famChips();
+      var live = m.score.filter(function (v, i) { return D.live[i] && !OUT_SET[i]; }), better = live.filter(function (v) { return v > median(sales); }).length;
+      card = '<p class="sec">Predicted sales, IDR / month</p>' + legendRamp('lower', 'higher') + '<div class="kv"><div><b>' + live.length.toLocaleString() + '</b><span>cells scored</span></div><div><b>' + better.toLocaleString() + '</b><span>beat median outlet</span></div></div><p class="note">Drag with right-click or two fingers to tilt. Model fit with these signals: R² ' + m.r2.toFixed(2) + '.</p>';
+    } else {
+      var picks = shortlist(), med = median(sales);
+      h = '<h2>Decide: a shortlist to check on the ground</h2><p>Take the highest-scoring cells, but keep each one a minimum distance from existing outlets and from each other so new stores don\'t eat each other\'s sales.</p>' +
+        '<div class="ctl"><span>Minimum spacing</span><b id="rv">' + S.radius.toFixed(1) + ' km</b><input id="rad" type="range" min="0.4" max="3" step="0.1" value="' + S.radius + '"></div>' +
+        '<div class="ctl"><span>Shortlist size</span><b id="nv">' + S.n + '</b><input id="num" type="range" min="3" max="20" step="1" value="' + S.n + '"></div><p class="sec">Signals used</p>' + famChips();
+      card = '<p class="sec">Top ' + picks.length + ' new sites <small>· vs median outlet</small></p><ol class="short" id="short">' + picks.map(function (c, k) {
+        var s = m.score[c]; return '<li data-k="' + k + '"' + (k === S.sel ? ' class="on"' : '') + '><i>' + (k + 1) + '</i><span>' + cellCenter(c).map(function (v) { return v.toFixed(3); }).reverse().join(', ') + '</span><b>' + fmt(s) + ' <span>' + (s >= med ? '+' : '') + Math.round((s / med - 1) * 100) + '%</span></b></li>'; }).join('') +
+        '</ol><div class="legend"><span><i class="sq ring"></i>shortlisted cell</span><span><i style="background:#fff"></i>existing outlet</span></div><p class="note">The real model guided growth from under 100 to 200+ outlets.</p>';
+    }
+    if (keep) { $('rv').textContent = S.radius.toFixed(1) + ' km'; $('nv').textContent = S.n; } else $('step').innerHTML = h;
+    $('card').innerHTML = card;
+    $('prev').disabled = st === 0; $('next').disabled = st === STEPS.length - 1;
+    if (keep) { if ($('short')) bindShort(); return; }
+    if ($('fams')) bindFams();
+    if ($('feat')) $('feat').onchange = function () { S.feat = this.value; renderStep(); draw(); };
+    if ($('rad')) $('rad').oninput = function () { S.radius = +this.value; S.sel = -1; renderStep(1); draw(); };
+    if ($('num')) $('num').oninput = function () { S.n = +this.value; S.sel = -1; renderStep(1); draw(); };
+    if ($('short')) bindShort();
+  }
+  function bindShort() {
+    $('short').onclick = function (e) { var li = e.target.closest('li'); if (!li) return; S.sel = +li.dataset.k;
+      map.flyTo({ center: cellCenter(shortlist()[S.sel]), zoom: 14, pitch: 50, duration: 900 }); renderStep(1); draw(); };
+  }
+  function go(i) {
+    var was = S.step; S.step = Math.max(0, Math.min(STEPS.length - 1, i)); S.sel = -1;
+    if ((S.step >= 3) !== (was >= 3)) map.easeTo({ pitch: S.step >= 3 ? 50 : 0, bearing: S.step >= 3 ? -15 : 0, zoom: MOBILE ? 10.6 : 11.7, center: [106.83, -6.235], duration: 900 });
+    renderStep(); draw();
+  }
+  $('prev').onclick = function () { go(S.step - 1); };
+  $('next').onclick = function () { go(S.step + 1); };
+  $('steps').onclick = function (e) { var b = e.target.closest('button'); if (b) go(+b.dataset.i); };
+
+  fetch('data/sites.json').then(function (r) { return r.json(); }).then(function (d) {
+    D = d; NC = d.meta.nx * d.meta.ny; d.outlets.forEach(function (o) { OUT_SET[o.c] = 1; });
+    var m = /[?&]step=(\d)/.exec(location.search); go(m ? +m[1] : 0);
+  });
+})();
+</script>
+</body>
+</html>
