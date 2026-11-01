@@ -19,17 +19,17 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); f
 .panel { top: 16px; left: 16px; width: 360px; max-height: calc(100% - 32px); padding: 18px 20px 14px; }
 .card { top: 16px; right: 16px; width: 320px; max-height: calc(100% - 110px); padding: 16px 18px 14px; }
 .card:empty { display: none; }
-.kick { font: 500 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 0; }
+.kick { font: 500 11px var(--mono); letter-spacing: .12em; color: var(--accent); margin: 0; }
 h1 { font-weight: 800; font-size: 28px; letter-spacing: -0.03em; line-height: 1.04; margin: 10px 0 0; }
 .lede { margin: 10px 0 0; color: var(--ink2); }
-.pill { display: inline-block; margin-top: 10px; font: 500 10.5px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); border: 1.5px solid var(--accent); border-radius: 999px; padding: 2px 9px; }
+.pill { display: inline-block; margin-top: 10px; font: 500 10.5px var(--mono); letter-spacing: .1em; color: var(--accent); border: 1.5px solid var(--accent); border-radius: 999px; padding: 2px 9px; }
 .steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin: 16px 0 0; }
-.steps button { font: 500 10px var(--mono); letter-spacing: .03em; text-transform: uppercase; color: var(--muted); background: none; border: 0; border-top: 3px solid var(--line); padding: 7px 0 0; text-align: left; cursor: pointer; }
+.steps button { font: 500 10px var(--mono); letter-spacing: .03em; color: var(--muted); background: none; border: 0; border-top: 3px solid var(--line); padding: 7px 0 0; text-align: left; cursor: pointer; }
 .steps button[aria-current="step"] { color: var(--accent); border-top-color: var(--accent); }
 .steps button.done { border-top-color: #b9bbe6; }
 .step h2 { margin: 14px 0 0; font-size: 19px; font-weight: 800; letter-spacing: -0.01em; }
 .step p { margin: 6px 0 0; color: var(--ink2); font-size: 13.5px; }
-.sec { margin: 14px 0 6px; font: 500 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.sec { margin: 14px 0 6px; font: 500 11px var(--mono); letter-spacing: .1em; color: var(--muted); }
 .sec small { letter-spacing: 0; text-transform: none; }
 .nav { display: flex; justify-content: space-between; margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
 button.b, .chips button { font: 600 12.5px "Archivo", sans-serif; color: var(--fg); background: var(--well); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; cursor: pointer; }
@@ -52,7 +52,7 @@ button.b:disabled { opacity: .35; cursor: default; }
 .kv { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
 .kv div { background: var(--well); border-radius: 8px; padding: 7px 9px; }
 .kv b { display: block; font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.kv span { font: 10.5px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.kv span { font: 10.5px var(--mono); color: var(--muted); letter-spacing: .05em; }
 .note { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
 select { width: 100%; font: 600 13px "Archivo", sans-serif; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: #1a1d2e; color: var(--fg); }
 .ctl { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; font-size: 12.5px; margin-top: 6px; }
@@ -96,7 +96,7 @@ body.embed .panel, body.embed .card { display: none; }
   <div class="steps" id="steps"></div>
   <div class="step" id="step"></div>
   <div class="nav"><button class="b" id="prev">← Back</button><button class="b go" id="next">Next →</button></div>
-  <p class="foot">Method from <a href="https://dhaneswara-mandrasa.vercel.app/project-retail-sites">the case study</a> · <a href="https://github.com/dhaneswaramandrasa/retail-site-selection">code</a> · POIs © OpenStreetMap contributors</p>
+  <p class="foot">Method from <a href="https://dhaneswara-mandrasa.vercel.app/project-retail-sites">the case study</a> <a href="https://github.com/dhaneswaramandrasa/retail-site-selection">code</a>, POIs © OpenStreetMap contributors</p>
 </div>
 <div class="card" id="card"></div>
 <div class="tt" id="tt"></div>
@@ -199,7 +199,7 @@ body.embed .panel, body.embed .card { display: none; }
     if (info.object == null) { tt.style.display = 'none'; return; }
     var html;
     if (info.layer.id === 'outlets') { var o = info.object;
-      html = '<b>Existing outlet</b> · ' + fmt(o.sales) + ' IDR / month<span>predicted ' + fmt(model().score[o.c]) + '</span>';
+      html = '<b>Existing outlet</b>, ' + fmt(o.sales) + ' IDR / month<span>predicted ' + fmt(model().score[o.c]) + '</span>';
     } else { var c = info.object, fi = D.meta.features.findIndex(function (f) { return f.key === S.feat; }), F = D.meta.features[fi];
       html = S.step === 1 ? '<b>' + D.feat[fi][c].toLocaleString() + '</b> ' + F.unit + '<span>' + F.label + '</span>'
         : '<b>' + fmt(model().score[c]) + ' IDR / month</b> predicted sales<span>' + (OUT_SET[c] ? 'has an outlet' : D.live[c] ? 'cell ' + c : 'little activity, not a candidate') + '</span>';
@@ -243,7 +243,7 @@ body.embed .panel, body.embed .card { display: none; }
       h = '<h2>Describe the area around every cell</h2><p>The map is cut into ' + NC.toLocaleString() + ' cells of about 400&nbsp;m. Each one gets eight attributes in three families, measured over a ~800&nbsp;m catchment. Pick one to see it.</p>' +
         '<p class="sec">Attribute</p><select id="feat">' + D.meta.families.map(function (f) { return '<optgroup label="' + FAML[f] + '">' + D.meta.features.filter(function (x) { return x.family === f; }).map(function (x) { return '<option value="' + x.key + '"' + (x.key === S.feat ? ' selected' : '') + '>' + x.label + '</option>'; }).join('') + '</optgroup>'; }).join('') + '</select>';
       var F = D.meta.features.find(function (x) { return x.key === S.feat; });
-      card = '<p class="sec">' + FAML[F.family] + ': ' + F.label + '</p>' + legendRamp('low', 'high · ' + F.unit) +
+      card = '<p class="sec">' + FAML[F.family] + ': ' + F.label + '</p>' + legendRamp('low', 'high, ' + F.unit) +
         (F.family === 'poi' ? '<div class="legend">' + D.meta.poiGroups.map(function (g, i) { return '<span><i style="background:rgb(' + POIC[i] + ')"></i>' + g + '</span>'; }).join('') + '</div><p class="note">' + D.meta.nPoi.toLocaleString() + ' real places and stops from OpenStreetMap.</p>'
           : F.family === 'demographic' ? '<p class="note">Synthetic, shaped to Jakarta\'s geography. In the real project this came from census and survey data.</p>'
           : '<p class="note">Transit access is real (OSM rail and bus stops). Footfall is a synthetic index built on it; the real project used mobility data.</p>');
